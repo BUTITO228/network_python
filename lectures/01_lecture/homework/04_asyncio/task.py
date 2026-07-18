@@ -22,6 +22,7 @@ Asyncio позволяет держать тысячи соединений в �
 """
 
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 # ═══════════════════════════════════════════════════════════
 # ЗАДАНИЕ 4.1 — Первая корутина
@@ -37,8 +38,8 @@ async def fetch_one_async(url: str) -> str:
         - Функция объявлена через async def
         - Возвращает f"data:{url}"
     """
-    # TODO: реализуйте
-    raise NotImplementedError
+    await asyncio.sleep(0.05)
+    return f"data:{url}"
 
 
 # ═══════════════════════════════════════════════════════════
@@ -53,8 +54,8 @@ async def fetch_all_async(urls: list[str]) -> list[str]:
         - Запустить fetch_one_async для каждого URL конкурентно
         - Вернуть результаты в порядке urls
     """
-    # TODO: реализуйте
-    raise NotImplementedError
+    results = await asyncio.gather(*[fetch_one_async(url) for url in urls])
+    return list(results)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -94,8 +95,27 @@ async def run_task_group(names: list[str]) -> dict[str, str | None]:
           и None для упавших задач
         - Если все задачи упали — вернуть пустой словарь
     """
-    # TODO: реализуйте
-    raise NotImplementedError
+    tasks = {}
+    try:
+        async with asyncio.TaskGroup() as tg:
+            for name in names:
+                task = tg.create_task(
+                    fetch_with_delay(name, delay=0.1, fail=("bad" in name))
+                )
+                tasks[name] = task
+    except* ValueError:
+        pass
+
+    if all("bad" in name for name in names) and names:
+        return {}
+
+    results = {}
+    for name, task in tasks.items():
+        try:
+            results[name] = task.result()
+        except Exception:
+            results[name] = None
+    return results
 
 
 # ═══════════════════════════════════════════════════════════
@@ -113,8 +133,11 @@ async def fetch_with_timeout(url: str, delay: float, timeout: float) -> str:
         - Если не уложились — выбросить TimeoutError
         - Если успели — вернуть результат fetch_one_async(url)
     """
-    # TODO: реализуйте
-    raise NotImplementedError
+    async def _fetch():
+        await asyncio.sleep(delay)
+        return f"data:{url}"
+
+    return await asyncio.wait_for(_fetch(), timeout=timeout)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -133,8 +156,14 @@ async def cancellable_worker(name: str, steps: int) -> str:
           f"  {name}: очищаю ресурсы..." и пробросить исключение ДАЛЬШЕ (raise)
         - Если не отменили — вернуть f"{name}: готов после {steps} шагов"
     """
-    # TODO: реализуйте
-    raise NotImplementedError
+    try:
+        for step in range(steps):
+            print(f"  {name}: шаг {step + 1}/{steps}")
+            await asyncio.sleep(0.1)
+        return f"{name}: готов после {steps} шагов"
+    except asyncio.CancelledError:
+        print(f"  {name}: очищаю ресурсы...")
+        raise
 
 
 async def run_with_cancel(name: str, steps: int, cancel_after: float) -> str | None:
@@ -148,8 +177,13 @@ async def run_with_cancel(name: str, steps: int, cancel_after: float) -> str | N
         - Если поймали CancelledError — вернуть None
         - Если задача успела завершиться — вернуть результат
     """
-    # TODO: реализуйте
-    raise NotImplementedError
+    task = asyncio.create_task(cancellable_worker(name, steps))
+    await asyncio.sleep(cancel_after)
+    task.cancel()
+    try:
+        return await task
+    except asyncio.CancelledError:
+        return None
 
 
 # ═══════════════════════════════════════════════════════════
@@ -177,8 +211,12 @@ async def fetch_as_completed(tasks: list[tuple[str, float]]) -> list[str]:
         - Использовать asyncio.as_completed() для обхода результатов
         - Вернуть список строк в порядке ЗАВЕРШЕНИЯ, а не в порядке запуска
     """
-    # TODO: реализуйте
-    raise NotImplementedError
+    coros = [fast_or_slow(name, delay) for name, delay in tasks]
+    results = []
+    for future in asyncio.as_completed(coros):
+        result = await future
+        results.append(result)
+    return results
 
 
 # ═══════════════════════════════════════════════════════════
@@ -214,5 +252,9 @@ async def async_process_numbers(numbers: list[int], max_workers: int = 4) -> lis
         - max_workers: размер пула потоков
         - Результаты в порядке numbers
     """
-    # TODO: реализуйте
-    raise NotImplementedError
+    loop = asyncio.get_event_loop()
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        results = await asyncio.gather(
+            *[loop.run_in_executor(executor, blocking_compute, x) for x in numbers]
+        )
+    return list(results)

@@ -15,6 +15,7 @@
    lectures/01_lecture/examples/02_threading/02_thread_pool.py
 """
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Callable
 
 
@@ -61,8 +62,9 @@ def fetch_all(urls: list[str], max_workers: int = 4) -> list[str]:
         >>> fetch_all(["a", "b", "c"], max_workers=2)
         ['data:a', 'data:b', 'data:c']
     """
-    # TODO: реализуйте
-    raise NotImplementedError
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        results = list(executor.map(fetch_one, urls))
+    return results
 
 
 # ═══════════════════════════════════════════════════════════
@@ -85,8 +87,17 @@ def fetch_all_with_errors(urls: list[str], max_workers: int = 4) -> list[str | N
         - Для "bad" URL вернуть None
         - Для остальных — результат fetch_one()
     """
-    # TODO: реализуйте
-    raise NotImplementedError
+    def safe_fetch(url: str) -> str | None:
+        if "bad" in url:
+            return None
+        try:
+            return fetch_one(url)
+        except Exception:
+            return None
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        results = list(executor.map(safe_fetch, urls))
+    return results
 
 
 # ═══════════════════════════════════════════════════════════
@@ -123,5 +134,16 @@ def fetch_all_with_progress(
         )
         # completed[-1] == 3
     """
-    # TODO: реализуйте
-    raise NotImplementedError
+    total = len(urls)
+    completed = 0
+    results = []
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(fetch_one, url): url for url in urls}
+        for future in as_completed(futures):
+            results.append(future.result())
+            completed += 1
+            if progress_callback:
+                progress_callback(completed, total)
+
+    return results

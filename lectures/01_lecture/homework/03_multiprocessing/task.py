@@ -13,6 +13,8 @@ multiprocessing.Pool.
    lectures/01_lecture/examples/03_multiprocessing/02_cpu_bound.py
 """
 
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+
 
 # ═══════════════════════════════════════════════════════════
 # ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ — не меняйте их
@@ -54,8 +56,7 @@ def compute_sequential(numbers: list[int]) -> list[int]:
 
     Просто для сравнения с параллельной версией.
     """
-    # TODO: реализуйте
-    raise NotImplementedError
+    return [heavy_compute(x) for x in numbers]
 
 
 def compute_parallel_pool(numbers: list[int], processes: int = 4) -> list[int]:
@@ -65,8 +66,9 @@ def compute_parallel_pool(numbers: list[int], processes: int = 4) -> list[int]:
         - Использовать Pool(processes) как context manager
         - Результаты в порядке numbers
     """
-    # TODO: реализуйте
-    raise NotImplementedError
+    with ProcessPoolExecutor(max_workers=processes) as executor:
+        results = list(executor.map(heavy_compute, numbers))
+    return results
 
 
 # ═══════════════════════════════════════════════════════════
@@ -79,5 +81,6 @@ def compute_with_threads(numbers: list[int], workers: int = 4) -> list[int]:
 
     Должно работать МЕДЛЕННЕЕ, чем Pool, из-за GIL.
     """
-    # TODO: реализуйте
-    raise NotImplementedError
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        results = list(executor.map(heavy_compute, numbers))
+    return results
